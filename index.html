@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How AI remembers</title>
+<style>
+:root{--bg:#f6f4ef;--fg:#1d2230;--mut:#6b7385;--card:#ffffff;--line:#d9d6cc;--q:#e0475f;--k:#d99a00;--v:#12906b;--a:#3b5bdb}
+@media (prefers-color-scheme:dark){:root{--bg:#12151c;--fg:#eceff5;--mut:#98a1b5;--card:#1b2030;--line:#2c3348;--q:#ff7a90;--k:#ffc857;--v:#4fd1a5;--a:#8aa4ff}}
+*{box-sizing:border-box;margin:0}
+html{scroll-snap-type:y proximity;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font:18px/1.55 "Iowan Old Style",Georgia,serif}
+#bar{position:fixed;top:0;left:0;height:4px;width:0;background:var(--a);z-index:9}
+section{min-height:100vh;padding:10vh 6vw;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;scroll-snap-align:start}
+h1{font-size:clamp(2.6rem,8vw,5.5rem);line-height:1.02;letter-spacing:-.03em;max-width:12ch}
+h2{font-size:clamp(1.8rem,4.6vw,3rem);line-height:1.1;letter-spacing:-.02em;max-width:18ch}
+p{max-width:34ch;color:var(--mut)}
+p b,h2 b{font-weight:700}
+.q{color:var(--q)}.k{color:var(--k)}.v{color:var(--v)}
+.rv{opacity:0;transform:translateY(22px);transition:opacity .8s,transform .8s}
+.rv.in{opacity:1;transform:none}
+.rv:nth-child(2){transition-delay:.12s}.rv:nth-child(3){transition-delay:.24s}.rv:nth-child(4){transition-delay:.36s}
+button{font:inherit;font-size:.9rem;font-family:system-ui,sans-serif;background:var(--fg);color:var(--bg);border:0;border-radius:99px;padding:.6em 1.3em;cursor:pointer;transition:transform .15s,opacity .2s}
+button:hover{transform:scale(1.05)}button:focus-visible,input:focus-visible{outline:3px solid var(--a);outline-offset:3px}
+button.ghost{background:transparent;color:var(--fg);border:2px solid var(--line)}
+button.on{background:var(--a);color:#fff;border-color:var(--a)}
+.row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;width:min(560px,100%)}
+.hint{font:.85rem system-ui,sans-serif;color:var(--mut);min-height:1.4em}
+.big{font:700 2.4rem system-ui,sans-serif;letter-spacing:-.02em}
+input[type=range]{width:100%;accent-color:var(--a)}
+.scroll{font:.85rem system-ui,sans-serif;color:var(--mut);animation:bob 1.6s infinite}
+@keyframes bob{50%{transform:translateY(8px)}}
+svg{max-width:100%;height:auto}
+.ln{stroke:var(--line);stroke-width:1.5;transition:stroke .3s,stroke-width .3s}.ln.on{stroke:var(--a);stroke-width:2.5}
+.nd{fill:var(--card);stroke:var(--fg);stroke-width:2;transition:fill .3s}.nd.on{fill:var(--a)}
+.track{position:relative;height:14px;background:var(--line);border-radius:9px;margin:34px 0 20px}
+.mk{position:absolute;top:-9px;width:32px;height:32px;margin-left:-16px;border-radius:50%;display:grid;place-items:center;font:1rem system-ui;transition:left .3s}
+#tg{background:var(--v);color:#fff}#gs{background:var(--a);color:#fff}
+#dots{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:min(520px,100%);min-height:90px;align-content:center}
+#dots i{width:12px;height:12px;border-radius:50%;background:var(--a);animation:pop .4s backwards}
+@keyframes pop{from{transform:scale(0)}}
+.bars{display:flex;gap:14px;align-items:flex-end;justify-content:center;height:160px}
+.bars i{width:38px;border-radius:8px 8px 0 0;background:var(--a);transition:height .7s cubic-bezier(.3,1.4,.5,1),background .5s}
+.toks{display:flex;flex-wrap:wrap;gap:6px 4px;justify-content:center;align-items:flex-end}
+.tk{display:flex;flex-direction:column;align-items:center;gap:6px}
+.tk button{background:var(--card);color:var(--fg);border:2px solid var(--line);border-radius:10px;padding:.35em .6em}
+.tk button.sel{border-color:var(--q);color:var(--q);font-weight:700}
+.tk em{display:block;width:100%;min-width:30px;height:70px;position:relative}
+.tk em span{position:absolute;bottom:0;left:15%;right:15%;border-radius:6px 6px 0 0;background:var(--k);transition:height .6s}
+.chip{padding:.35em .7em;border-radius:10px;border:2px solid var(--line);font:.9rem system-ui;transition:all .35s;min-width:48px;text-align:center;color:var(--mut)}
+.chip.w{background:var(--q);border-color:var(--q);color:#fff;transform:scale(1.08)}
+.chip.s{background:var(--v);border-color:var(--v);color:#fff;opacity:.55}
+.chip.n{background:var(--k);border-color:var(--k);color:#111;transform:scale(1.08)}
+.lane{display:flex;flex-direction:column;gap:8px;align-items:center}
+.cnt{height:10px;border-radius:6px;background:var(--q);transition:width .5s;width:0;max-width:100%}
+.cnt.g{background:var(--v)}
+.recap{display:grid;gap:12px;text-align:left;max-width:520px;color:var(--fg)}
+.recap div{padding-left:14px;border-left:4px solid var(--a)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<section>
+  <h1 class="rv">How AI remembers</h1>
+  <p class="rv">Eight short scrolls. No maths. Play with everything.</p>
+  <div class="scroll rv">scroll ↓</div>
+</section>
+
+<section>
+  <h2 class="rv">A neural network is a chain of tiny dials.</h2>
+  <svg id="net" class="rv" viewBox="0 0 400 220" width="440" aria-label="Network diagram"></svg>
+  <p class="rv">Something goes in. It passes through layers. An answer comes out.</p>
+  <button class="rv" id="send">Send a signal</button>
+</section>
+
+<section>
+  <h2 class="rv">Learning is guess, miss, nudge.</h2>
+  <div class="card rv">
+    <div class="track"><div class="mk" id="tg">◎</div><div class="mk" id="gs">●</div></div>
+    <input type="range" id="g" min="0" max="100" value="12" aria-label="Your guess">
+    <div class="big" id="miss">Miss: 61</div>
+    <div class="hint" id="lh">Drag the dial to hit ◎</div>
+  </div>
+  <button class="rv" id="learn">Let it learn</button>
+  <p class="rv">AI does this billions of times, on its own.</p>
+</section>
+
+<section>
+  <h2 class="rv">Each dial is a <b>weight</b>.</h2>
+  <p class="rv">All the weights together are called <b>parameters</b>.</p>
+  <div id="dots" class="rv"></div>
+  <div class="big rv" id="pc">12</div>
+  <input class="rv" style="max-width:420px" type="range" id="ps" min="0" max="4" value="0" aria-label="Model size">
+  <div class="hint" id="pn">A toy</div>
+</section>
+
+<section>
+  <h2 class="rv">A word becomes numbers.</h2>
+  <p class="rv">Then we look at those numbers through different <b>lenses</b>. A lens is a <b>projection</b>.</p>
+  <div class="card rv">
+    <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="hint" style="margin:12px 0" id="lh2">The word “bank”, as 5 numbers</div>
+    <div class="row">
+      <button class="ghost on" data-l="o">Raw</button>
+      <button class="ghost" data-l="q" style="color:var(--q)">Q lens</button>
+      <button class="ghost" data-l="k" style="color:var(--k)">K lens</button>
+      <button class="ghost" data-l="v" style="color:var(--v)">V lens</button>
+    </div>
+  </div>
+  <p class="rv">Same word. Three views. Each lens is a set of weights, learned in training.</p>
+</section>
+
+<section>
+  <h2 class="rv">Three roles. <b class="q">Q</b> <b class="k">K</b> <b class="v">V</b></h2>
+  <div class="row rv" style="gap:26px;max-width:700px">
+    <p style="max-width:20ch"><b class="q">Query</b><br>What am I looking for?</p>
+    <p style="max-width:20ch"><b class="k">Key</b><br>What do I offer? <i>(the label)</i></p>
+    <p style="max-width:20ch"><b class="v">Value</b><br>What do I hand over? <i>(the content)</i></p>
+  </div>
+  <p class="rv">Think of a filing cabinet: you bring a question, read the labels, open the best folders.</p>
+</section>
+
+<section>
+  <h2 class="rv">Try it: what does a word look back at?</h2>
+  <div class="toks rv" id="toks"></div>
+  <div class="hint rv" id="at" style="font-size:1rem"></div>
+  <p class="rv">Tap a word. Bars show how much of each earlier word’s <b class="v">value</b> it takes, based on <b class="q">query</b> meeting <b class="k">key</b>. Words only look back, never ahead.</p>
+</section>
+
+<section>
+  <h2 class="rv">The catch: AI writes one word at a time.</h2>
+  <p class="rv">Every new word must look back at <b>all</b> earlier words. Their <b class="k">K</b> and <b class="v">V</b> were already worked out. They never change.</p>
+  <p class="rv">So why redo them?</p>
+</section>
+
+<section>
+  <h2 class="rv">The KV-cache: keep your notes.</h2>
+  <div class="card rv" style="display:grid;gap:22px">
+    <div class="lane"><b style="font:600 .95rem system-ui">Without cache <span style="color:var(--mut)">redo everything</span></b>
+      <div class="row" id="ra"></div><div class="cnt" id="ca"></div><div class="hint" id="ta">Work: 0</div></div>
+    <div class="lane"><b style="font:600 .95rem system-ui">With cache <span style="color:var(--mut)">only the new word</span></b>
+      <div class="row" id="rb"></div><div class="cnt g" id="cb"></div><div class="hint" id="tb">Work: 0</div></div>
+  </div>
+  <div class="row rv"><button id="nx">Write next word</button><button class="ghost" id="rs">Reset</button></div>
+  <div class="hint rv" id="cm" style="max-width:40ch"></div>
+</section>
+
+<section>
+  <h2 class="rv">Remember it like this.</h2>
+  <div class="recap rv">
+    <div><b>Weights</b> are dials. Together: <b>parameters</b>.</div>
+    <div><b>Learning</b> is guess, miss, nudge.</div>
+    <div><b>Projections</b> are lenses on a word’s numbers.</div>
+    <div><b class="q">Q</b> asks. <b class="k">K</b> is the label. <b class="v">V</b> is the content.</div>
+    <div>The <b>KV-cache</b> keeps old K and V, so each new word costs one, not all.</div>
+    <div>Trade-off: the notebook grows with every word, and uses <b>memory</b>. Making that cheaper is a whole field.</div>
+  </div>
+</section>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const io=new IntersectionObserver(e=>e.forEach(x=>x.isIntersecting&&x.target.classList.add('in')),{threshold:.2});
+$$('.rv').forEach(e=>io.observe(e));
+addEventListener('scroll',()=>{$('#bar').style.width=scrollY/(document.body.scrollHeight-innerHeight)*100+'%'},{passive:true});
+
+// 1. network
+const L=[3,4,4,2],NS='http://www.w3.org/2000/svg',net=$('#net'),nodes=[],lines=[];
+const pos=L.map((n,i)=>Array.from({length:n},(_,j)=>[50+i*100,110+(j-(n-1)/2)*46]));
+pos.forEach((l,i)=>i&&l.forEach(b=>pos[i-1].forEach(a=>{const e=document.createElementNS(NS,'line');e.setAttribute('x1',a[0]);e.setAttribute('y1',a[1]);e.setAttribute('x2',b[0]);e.setAttribute('y2',b[1]);e.setAttribute('class','ln');e.dataset.l=i;net.appendChild(e);lines.push(e)})));
+pos.forEach((l,i)=>l.forEach(p=>{const c=document.createElementNS(NS,'circle');c.setAttribute('cx',p[0]);c.setAttribute('cy',p[1]);c.setAttribute('r',10);c.setAttribute('class','nd');c.dataset.l=i;net.appendChild(c);nodes.push(c)}));
+function pulse(){for(let i=0;i<L.length;i++){setTimeout(()=>{nodes.forEach(n=>n.classList.toggle('on',+n.dataset.l===i));lines.forEach(n=>n.classList.toggle('on',+n.dataset.l===i))},i*450)}
+setTimeout(()=>{nodes.concat(lines).forEach(n=>n.classList.remove('on'))},L.length*450+200)}
+$('#send').onclick=pulse;setInterval(()=>{const r=net.getBoundingClientRect();r.top<innerHeight&&r.bottom>0&&pulse()},4200);
+
+// 2. learning
+const T=73,g=$('#g');let timer;
+function upd(){const v=+g.value,m=Math.abs(T-v);$('#gs').style.left=v+'%';$('#tg').style.left=T+'%';$('#miss').textContent='Miss: '+m;
+$('#lh').textContent=m===0?'Bullseye. That is learning.':m<8?'Close. Nudge a little more.':'Drag the dial to hit ◎'}
+g.oninput=()=>{clearInterval(timer);upd()};upd();
+$('#learn').onclick=()=>{clearInterval(timer);g.value=5;upd();timer=setInterval(()=>{let v=+g.value;v+=Math.ceil((T-v)*.25);g.value=Math.min(v,T);upd();if(v>=T)clearInterval(timer)},450)};
+
+// 3. parameters
+const PN=[[12,'12','A toy'],[60,'1,000','A tiny model'],[120,'1,000,000','A small model'],[240,'1,000,000,000','A phone-sized AI'],[480,'70,000,000,000','A chatbot-sized AI']];
+function dots(){const [n,t,d]=PN[+$('#ps').value];$('#pc').textContent=t;$('#pn').textContent=d+' · each dot is a dial';
+$('#dots').innerHTML=Array.from({length:n},(_,i)=>`<i style="animation-delay:${Math.min(i*6,600)}ms"></i>`).join('')}
+$('#ps').oninput=dots;dots();
+
+// 4. projections
+const V={o:[.8,.3,.6,.2,.9],q:[.2,.9,.4,.7,.3],k:[.6,.1,.9,.5,.2],v:[.4,.5,.2,.9,.7]};
+const CL={o:'var(--a)',q:'var(--q)',k:'var(--k)',v:'var(--v)'};
+const TX={o:'The word “bank”, as 5 numbers',q:'Q view: what is “bank” looking for?',k:'K view: what label does “bank” wear?',v:'V view: what content does “bank” hand over?'};
+$$('[data-l]').forEach(b=>b.onclick=()=>{const l=b.dataset.l;$$('[data-l]').forEach(x=>x.classList.toggle('on',x===b));
+$$('#bars i').forEach((e,i)=>{e.style.height=V[l][i]*150+'px';e.style.background=CL[l]});$('#lh2').textContent=TX[l]});
+$$('#bars i').forEach((e,i)=>{e.style.height=V.o[i]*150+'px'});
+
+// 5. attention
+const W=['The','trophy','didn’t','fit','in','the','suitcase','because','it','was','big'];
+function wts(q){let a=W.map((_,j)=>j>q?0:Math.exp(-(q-j)*.45));
+if(q===8){a[1]*=7;a[6]*=2.2}if(q===10){a[1]*=4;a[8]*=2.5}
+const s=a.reduce((x,y)=>x+y);return a.map(x=>x/s)}
+function att(q){const w=wts(q);$('#toks').innerHTML=W.map((t,j)=>`<div class="tk"><em>${j<=q?`<span style="height:${w[j]*70/Math.max(...w)}px"></span>`:''}</em><button class="${j===q?'sel':''}" data-j="${j}" ${j>q?'style="opacity:.35"':''}>${t}</button></div>`).join('');
+const top=w.map((x,j)=>[x,j]).sort((a,b)=>b[0]-a[0]).slice(0,2).filter(x=>x[1]!==q);
+$('#at').innerHTML=`“${W[q]}” takes most from ${top.map(x=>`<b class="v">${W[x[1]]}</b> ${Math.round(x[0]*100)}%`).join(' and ')}.`;
+$$('#toks button').forEach(b=>b.onclick=()=>att(+b.dataset.j))}
+att(8);
+
+// 7. cache
+const C=['The','cat','sat','on','the','mat','and','purred'];let n=0,ta=0,tb=0;
+function draw(w){const f=(id,cls)=>$(id).innerHTML=C.slice(0,n).map((t,i)=>`<span class="chip ${cls(i)}">${t}</span>`).join('');
+f('#ra',()=>w?'w':'');f('#rb',i=>i===n-1?(w?'n':''):'s');
+$('#ta').textContent='Work: '+ta+' notes written';$('#tb').textContent='Work: '+tb+' notes written';
+$('#ca').style.width=ta/37*100+'%';$('#cb').style.width=tb/37*100+'%'}
+function reset(){n=1;ta=tb=1;draw(false);$('#cm').textContent='Press “Write next word”.'}
+$('#nx').onclick=()=>{if(n>=C.length){$('#cm').textContent='Done. Same sentence either way. Cache did '+tb+' jobs, not '+ta+'.';return}
+n++;ta+=n;tb+=1;draw(true);
+$('#cm').innerHTML=n===C.length?`Same sentence. <b>${tb}</b> jobs instead of <b>${ta}</b>. The cost: the notes take memory, and grow with every word.`:'<span style="color:var(--q)">Red</span> = redone. <span style="color:var(--k)">Yellow</span> = new. <span style="color:var(--v)">Green</span> = reused.'};
+$('#rs').onclick=reset;reset();
+</script>
+</body>
+</html>
